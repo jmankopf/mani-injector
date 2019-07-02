@@ -1,0 +1,48 @@
+{
+  "name": "mani-injector",
+  "version": "0.0.1-pre.1",
+  "description": "Very fast and lightweight dependency injection for typescript",
+  "author": "Jan Mankopf",
+  "keywords": [
+    "dependency injection",
+    "dependency",
+    "injection",
+    "ioc",
+    "container",
+    "javascript",
+    "typescript"
+  ],
+  "license": "MIT",
+  "main": "dist/cjs/injector.js",
+  "module": "./dist/esm2015/injector.js",
+  "es2015": "./dist/esm2015/injector.js",
+  "typings": "./dist/typings/injector.d.ts",
+  "files": [
+    "dist/*",
+    "src/*"
+  ],
+  "scripts": {
+    "build": "npm run clean && npm run build:cjs && npm run build:es2015 && npm run build:types",
+    "build:cjs": "tsc",
+    "build:es2015": "tsc -p ./typescript/tsconfig.esm2015.json",
+    "build:types": "tsc -p ./typescript/tsconfig.types.json",
+    "clean": "rimraf ./dist",
+    "publish-dry": "npm publish --dry-run",
+    "publish": "npm publish",
+    "test": "jest",
+    "test-coverage": "jest --collectCoverage"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.13",
+    "jest": "^24.8.0",
+    "reflect-metadata": "^0.1.13",
+    "rimraf": "^2.6.3",
+    "ts-jest": "^24.0.2",
+    "tslib": "^1.10.0",
+    "typescript": "^3.5.1"
+  },
+  "peerDependencies": {
+    "tslib": "^1.10.0",
+    "reflect-metadata": "^0.1.13"
+  }
+}
