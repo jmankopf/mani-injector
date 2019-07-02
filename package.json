@@ -21,6 +21,10 @@
     "dist/*",
     "src/*"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jmankopf/mani-injector.git"
+  },
   "bugs": {
     "url": "https://github.com/jmankopf/mani-injector/issues"
   },
