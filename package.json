@@ -21,6 +21,10 @@
     "dist/*",
     "src/*"
   ],
+  "bugs": {
+    "url": "https://github.com/jmankopf/mani-injector/issues"
+  },
+  "homepage": "https://github.com/jmankopf/mani-injector#readme",
   "scripts": {
     "build": "npm run clean && npm run build:cjs && npm run build:es2015 && npm run build:types",
     "build:cjs": "tsc",
