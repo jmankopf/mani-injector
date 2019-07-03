@@ -1,5 +1,4 @@
-import {EntityComponent, GetComponent, GetEntity, Inject, Injector, Parameter} from '../src/injector';
-import {Params} from './simpleClasses';
+import {EntityComponent, GetComponent, GetEntity, Inject, Injector} from '../src/injector';
 
 export class CompTestA {
     valueA = 'testA';
@@ -56,16 +55,6 @@ export class CompTestSystemAJustComponent {
 }
 export class CompTestSystemAJustEntity {
     constructor(
-        @GetEntity readonly entity: Object,
-        @Inject readonly injector: Injector,
-    ) {
-    }
-}
-
-export class CompTestSystemAParams {
-    constructor(
-        @Parameter readonly params:Params,
-        @GetComponent readonly componentA: CompTestA,
         @GetEntity readonly entity: Object,
         @Inject readonly injector: Injector,
     ) {

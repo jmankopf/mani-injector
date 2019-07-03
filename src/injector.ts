@@ -1,38 +1,43 @@
 import 'reflect-metadata';
 
-type Class<T = any> = { new(...args: any[]): T; }
+type Class<T = any> = { name: string, new(...args: any[]): T; }
 type ComponentClass = Class;
 type EntityClass = Class;
-
-type FirstParameter<T extends Class> = ConstructorParameters<T>[0];
 
 type ProviderFunction = () => unknown;
 type ResolverFunction = (context?: any) => unknown;
 
 type ID = string | symbol;
 
-type InjectDependency = { kind: 'inject'; index: number; id: ID; type: Class; };
-type ParameterDependency = { kind: 'parameter'; index: number; };
-type TypeDependency = { kind: 'type'; index: number; id: ID; };
-type ComponentDependency = { kind: 'component'; index: number; type: Class; };
-type EntityDependency = { kind: 'entity'; index: number };
-type Dependency = InjectDependency | ParameterDependency | TypeDependency | ComponentDependency | EntityDependency;
+const enum DependencyKind { INJECT, TYPE, COMPONENT, ENTITY}
 
-type ClassTypeMapping = { kind: 'class'; id: ID; type: Class; };
-type ValueTypeMapping = { kind: 'value'; value: unknown; };
-type ProviderTypeMapping = { kind: 'provider'; provider: ProviderFunction; };
-type TypeMapping = ClassTypeMapping | ValueTypeMapping | ProviderTypeMapping | { kind: undefined };
+type InjectDependency = { kind: DependencyKind.INJECT; index: number; id: ID; type: Class; };
+type TypeDependency = { kind: DependencyKind.TYPE; index: number; id: ID; };
+type ComponentDependency = { kind: DependencyKind.COMPONENT; index: number; type: Class; };
+type EntityDependency = { kind: DependencyKind.ENTITY; index: number };
+type Dependency = InjectDependency | TypeDependency | ComponentDependency | EntityDependency;
+
+const enum TypeMappingKind { CLASS, SINGLETON, VALUE, PROVIDER}
+
+type ClassTypeMapping = { kind: TypeMappingKind.CLASS; type: Class };
+type SingletonTypeMapping = { kind: TypeMappingKind.SINGLETON; type: Class; injector: Injector };
+type ValueTypeMapping = { kind: TypeMappingKind.VALUE; value: unknown; };
+type ProviderTypeMapping = { kind: TypeMappingKind.PROVIDER; provider: ProviderFunction; };
 // undefined kind is needed because there is no default mapping for types
+type TypeMapping = ClassTypeMapping | SingletonTypeMapping | ValueTypeMapping | ProviderTypeMapping | { kind: undefined };
 
-type InstanceClassMapping = { kind: 'instance'; };
-type ValueClassMapping = { kind: 'value'; value: unknown; };
-type SingletonClassMapping = { kind: 'singleton'; };
-type ProviderClassMapping = { kind: 'provider'; provider: ProviderFunction; };
+const enum MappingKind { INSTANCE, VALUE, SINGLETON, PROVIDER}
+
+type InstanceClassMapping = { kind: MappingKind.INSTANCE; };
+type ValueClassMapping = { kind: MappingKind.VALUE; value: unknown; };
+type SingletonClassMapping = { kind: MappingKind.SINGLETON; injector: Injector };
+type ProviderClassMapping = { kind: MappingKind.PROVIDER; provider: ProviderFunction; };
 type ClassMapping = InstanceClassMapping | ValueClassMapping | SingletonClassMapping | ProviderClassMapping;
 
-// most of the mappings are with the default id, store them in the def field so we eliminate a second map lookup
+// most of the class mappings are done with the default id, store them in the def field so we eliminate a second map lookup
 type MapContainer = { map: Map<ID, ClassMapping>; def?: ClassMapping; };
 type SingletonContainer = { map: Map<ID, Object>; def?: Object; };
+type ClassResolverContainer = { map: Map<ID, ResolverFunction>; def?: ResolverFunction; };
 
 type EntityResolverContext = { kind: 'entity', entityClass: Object; };
 type ResolverContext = EntityResolverContext | undefined;
@@ -44,10 +49,8 @@ interface ClassMapper<T extends Class> {
 }
 
 interface TypeMapper<T> {
-    toClass<C extends Class<T>>(classValue: C, params?: FirstParameter<C>): void;
-    toClassId<C extends Class<T>>(classValue: C, id: ID, param?: FirstParameter<C>): void;
-    toMapClass<C extends Class<T>>(classValue: C, param?: FirstParameter<C>): ClassMapper<C>;
-    toMapClassId<C extends Class<T>>(classValue: C, id: ID, param?: FirstParameter<C>): ClassMapper<C>;
+    toClass<C extends Class<T>>(classValue: C): void;
+    toSingleton<C extends Class<T>>(classValue: C): void;
     toValue(value: T): void;
     toProvider(provider: () => T): void;
 }
@@ -77,15 +80,10 @@ const createDependencyAnnotation = (cb: (type: any, index: number, dependantType
     depList.push(cb(type, index, dependantType));
 };
 
-const hasParameterAnnotation = (type: Class) => {
-    const dependency = dependencyMap.get(type);
-    return dependency && dependency.filter(v => v.kind === 'parameter').length > 0;
-};
-
 const getComponentDependencies = (system: Class) => {
     const dependencies = dependencyMap.get(system);
     return dependencies
-        ? dependencies.filter((dependency): dependency is ComponentDependency => dependency.kind === 'component')
+        ? dependencies.filter((dependency): dependency is ComponentDependency => dependency.kind === DependencyKind.COMPONENT)
         : [];
 };
 
@@ -107,17 +105,11 @@ const getEntityClassesForComponentDependencies = (componentTypes: Class[]): Clas
     return result;
 };
 
-export const Inject = createDependencyAnnotation((type, index) => ({kind: 'inject', index, type, id: ''}));
-export const InjectId = (id: ID) => createDependencyAnnotation((type, index) => ({kind: 'inject', index, type, id}));
-export const InjectType = (id: ID) => createDependencyAnnotation((_type, index) => ({kind: 'type', index, id}));
-export const Parameter = createDependencyAnnotation((_type, index, dependantType) => {
-    if (index !== 0) {
-        throw new Error(`Error mapping ${dependantType.name}. Parameter dependency needs to be the first argument`);
-    }
-    return {kind: 'parameter', index};
-});
-export const GetComponent = createDependencyAnnotation((type, index) => ({kind: 'component', type, index}));
-export const GetEntity = createDependencyAnnotation((_type, index) => ({kind: 'entity', index}));
+export const Inject = createDependencyAnnotation((type, index) => ({kind: DependencyKind.INJECT, index, type, id: ''}));
+export const InjectId = (id: ID) => createDependencyAnnotation((type, index) => ({kind: DependencyKind.INJECT, index, type, id}));
+export const InjectType = (id: ID) => createDependencyAnnotation((_type, index) => ({kind: DependencyKind.TYPE, index, id}));
+export const GetComponent = createDependencyAnnotation((type, index) => ({kind: DependencyKind.COMPONENT, type, index}));
+export const GetEntity = createDependencyAnnotation((_type, index) => ({kind: DependencyKind.ENTITY, index}));
 export const EntityComponent = (target: object, propertyKey: string): any => {
     const entityClass = target.constructor;
     const componentClass = Reflect.getMetadata('design:type', target, propertyKey);
@@ -128,19 +120,21 @@ export const EntityComponent = (target: object, propertyKey: string): any => {
     componentSet.set(componentClass, propertyKey);
 };
 
-type SystemResolvers<T extends Class> = [
-    T,
-    ResolverFunction[]
-    ]
+type SystemResolvers<T extends Class> = [T, ResolverFunction[]]
 
 export class Injector<SystemClass extends Class = Class> {
     static readonly dependencyMap = dependencyMap;
 
     protected readonly typeMappings = new Map<ID, TypeMapping>();
     protected readonly classMappings = new Map<Class, MapContainer>();
-    protected readonly resolvers = new Map<Class, ResolverFunction[]>();
-    protected readonly params = new Map<Class, unknown>();
+    protected readonly resolverArrays = new Map<Class, ResolverFunction[]>();
+
+    protected readonly classResolvers = new Map<Class, ClassResolverContainer>();
+    protected readonly typeResolvers = new Map<ID, ResolverFunction>();
+
     protected readonly singletons = new Map<Class, SingletonContainer>();
+    protected readonly typeSingletons = new Map<ID, Object>();
+
     protected readonly entitySystemMap = new Map<EntityClass, SystemClass[]>();
     protected readonly entitySystemResolverTuples = new Map<EntityClass, SystemResolvers<SystemClass>[]>();
 
@@ -152,21 +146,14 @@ export class Injector<SystemClass extends Class = Class> {
         return new (<typeof Injector>this.constructor)(this) as this;
     }
 
-    map<T extends Class>(type: T, param?: FirstParameter<T>): ClassMapper<T> {
-        return this.mapId<T>(type, '', param);
-    }
-
-    mapId<T extends Class>(type: T, id: ID, param?: FirstParameter<T>): ClassMapper<T> {
-        this.storeParams(type, param);
-
-        const mapper = new InternalClassMapper<T>(type);
+    map<T extends Class>(type: T, id: ID = ''): ClassMapper<T> {
+        const mapper = new InternalClassMapper<T>(this);
         const idMappings = putIfAbsent(this.classMappings, type as Class, (): MapContainer => ({map: new Map<ID, ClassMapping>()}));
         if (id === '') {
             idMappings.def = mapper.mapping;
         } else {
             idMappings.map.set(id, mapper.mapping);
         }
-
         return mapper;
     }
 
@@ -177,61 +164,15 @@ export class Injector<SystemClass extends Class = Class> {
     }
 
     getType<T>(id: ID): T {
-        const mapping = this.typeMappings.get(id);
-        if (!mapping || !mapping.kind) {
-            if (!this.parent) {
-                throw new Error(`No TypeMapping for id ${String(id)}`);
-            }
-            return this.parent.getType<T>(id);
-        }
-        if (mapping.kind === 'value') {
-            return mapping.value as T;
-        } else if (mapping.kind === 'class') {
-            return this.get(mapping.type, mapping.id);
-        } else {
-            // has to be provider
-            return mapping.provider() as T;
-        }
+        return this.getTypeResolver(id)() as T;
     }
 
     get<T extends Class>(type: T, id: ID = ''): InstanceType<T> {
-        const idMapping = this.classMappings.get(type);
-        if (!idMapping) {
-            if (!this.parent) {
-                throw new Error(`No Mapping for Type ${type.name}`);
-            }
-            return this.parent.get(type, id);
-        }
-        const mapping = id === '' ? idMapping.def : idMapping.map.get(id);
-        if (!mapping) {
-            if (!this.parent) {
-                throw new Error(`No Mapping for Type ${type.name} with id: '${String(id)}'`);
-            }
-            return this.parent.get(type, id);
-        }
-        if (mapping.kind === 'singleton') {
-            const singletonIds = putIfAbsent(this.singletons, type as Class, (): SingletonContainer => ({map: new Map<ID, Object>()}));
-            if (id === '') {
-                if (!singletonIds.def) {
-                    return singletonIds.def = this.createInstance(type);
-                }
-                return singletonIds.def as InstanceType<T>;
-            } else
-                return putIfAbsent(singletonIds.map, id, () => this.createInstance(type));
-        }
-        if (mapping.kind === 'value') {
-            return mapping.value as InstanceType<T>;
-        }
-        if (mapping.kind === 'provider') {
-            return mapping.provider() as InstanceType<T>;
-        }
-
-        return this.createInstance(type);
+        return this.getClassIdResolver(type, id)() as InstanceType<T>;
     }
 
-    registerSystem<T extends SystemClass>(systemClass: T, param?: FirstParameter<T>) {
+    registerSystem<T extends SystemClass>(systemClass: T) {
         // TODO: check if system is already mapped
-        this.storeParams(systemClass, param);
         const componentDependencies = getComponentDependencies(systemClass).map(dependency => dependency.type);
         const entityClasses = getEntityClassesForComponentDependencies(componentDependencies);
         if (entityClasses.length === 0) {
@@ -254,7 +195,7 @@ export class Injector<SystemClass extends Class = Class> {
 
             const result: SystemResolvers<SystemClass>[] = [];
             for (const system of systems!) {
-                result.push([system, this.createResolver(system, {kind: 'entity', entityClass: entity.constructor})]);
+                result.push([system, this.createResolverArray(system, {kind: 'entity', entityClass: entity.constructor})]);
             }
             return result;
         });
@@ -270,19 +211,10 @@ export class Injector<SystemClass extends Class = Class> {
     }
 
     private createInstance<T extends Class>(type: T) {
-        const resolvers = putIfAbsent(this.resolvers, type as Class, () => this.createResolver(type));
-        if (resolvers.length == 0) {
-            return new type();
-        }
-        const args = new Array(resolvers.length);
-
-        for (let i = 0; i < args.length; i++) {
-            args[i] = resolvers[i]();
-        }
-        return new type(...args);
+        return this.getCreateInstanceResolver(type)();
     }
 
-    private createResolver(type: Class, resolverContext?: ResolverContext) {
+    private createResolverArray(type: Class, resolverContext?: ResolverContext) {
         const result: ResolverFunction[] = [];
         const dependencies = dependencyMap.get(type);
         if (!dependencies) {
@@ -290,20 +222,17 @@ export class Injector<SystemClass extends Class = Class> {
         }
         for (const dependency of dependencies) {
             let resolver: ResolverFunction;
-            if (dependency.kind === 'inject') {
+            if (dependency.kind === DependencyKind.INJECT) {
                 if (!dependency.type) throw new Error(`Undefined dependency type for ${type.name}. Check for circular dependency.`);
-                resolver = this.createInjectResolver(dependency.type, dependency.id);
-            } else if (dependency.kind === 'type') {
-                resolver = this.createTypeResolver(type, dependency);
-            } else if (dependency.kind === 'parameter') {
-                const param = this.params.get(type);
-                resolver = () => param;
-            } else if (dependency.kind === 'entity') {
+                resolver = this.getClassIdResolver(dependency.type, dependency.id);
+            } else if (dependency.kind === DependencyKind.TYPE) {
+                resolver = this.getTypeResolver(dependency.id);
+            } else if (dependency.kind === DependencyKind.ENTITY) {
                 if (!resolverContext || resolverContext.kind !== 'entity') {
                     throw new Error(`Could not resolve Entity in ${type.name}. @GetEntity only allowed in entity scope.`);
                 }
                 resolver = (entity: any) => entity;
-            } else if (dependency.kind === 'component') {
+            } else if (dependency.kind === DependencyKind.COMPONENT) {
                 if (!resolverContext || resolverContext.kind !== 'entity') {
                     throw new Error(`Could not resolve ${dependency.type.name} in ${type.name}. @GetComponent only allowed in entity scope.`);
                 }
@@ -319,67 +248,118 @@ export class Injector<SystemClass extends Class = Class> {
         return result;
     }
 
-    private getMapping(type: Class, id: ID): ClassMapping {
+    private getClassMapping(type: Class, id: ID): ClassMapping {
         const idMapping = this.classMappings.get(type);
         if (!idMapping) {
             if (!this.parent) {
                 throw new Error(`No Mapping for Type ${type.name}`);
             }
-            return this.parent.getMapping(type, id);
+            return this.parent.getClassMapping(type, id);
         }
         const mapping = id === '' ? idMapping.def : idMapping.map.get(id);
         if (!mapping) {
             if (!this.parent) {
                 throw new Error(`No Mapping for Type ${type.name} with id: '${String(id)}'`);
             }
-            return this.parent.getMapping(type, id);
+            return this.parent.getClassMapping(type, id);
         }
         return mapping;
     }
 
-    private createInjectResolver(dependencyType: Class, id: ID) {
-        const mapping = this.getMapping(dependencyType, id);
-        switch (mapping.kind) {
-            case 'instance':
-                return () => this.get(dependencyType, id);
-            case 'singleton':
-            case 'value':
-                // we can cache the value for single instances
-                const instance = this.get(dependencyType, id);
-                return () => instance;
-            case 'provider':
-                // we can directly set the provider function as resolver
-                return mapping.provider;
-        }
-    }
-
-    private createTypeResolver(type: Class, dependency: TypeDependency): ResolverFunction {
-        const mapping = this.typeMappings.get(dependency.id);
-        if (!mapping || !mapping.kind) {
-            if (!this.parent) {
-                throw new Error(`No TypeMapping for id ${String(dependency.id)}`);
+    private getClassIdResolver(dependencyType: Class, id: ID) {
+        // TODO create a class/helper like putIfAbsent for nested maps / multiple keys
+        const getResolver = (): ResolverFunction => {
+            const mapping = this.getClassMapping(dependencyType, id);
+            switch (mapping.kind) {
+                case MappingKind.INSTANCE:
+                    return this.getCreateInstanceResolver(dependencyType);
+                // return () => this.createInstance(dependencyType);
+                case MappingKind.VALUE:
+                    // we can cache the value for values
+                    const instance = mapping.value;
+                    return () => instance;
+                case MappingKind.SINGLETON:
+                    let singleton: unknown;
+                    // use the injector defined in the mapping to get the right injector
+                    const singletonContainer = putIfAbsent(mapping.injector.singletons, dependencyType, (): SingletonContainer => ({map: new Map<ID, Object>()}));
+                    if (id === '') {
+                        if (singletonContainer.def) {
+                            singleton = singletonContainer.def;
+                        } else {
+                            singletonContainer.def = mapping.injector.createInstance(dependencyType);
+                            singleton = singletonContainer.def;
+                        }
+                    } else {
+                        singleton = putIfAbsent(singletonContainer.map, id, () => mapping.injector.createInstance(dependencyType));
+                    }
+                    return () => singleton;
+                case MappingKind.PROVIDER:
+                    // we can directly set the provider function as resolver
+                    return mapping.provider;
             }
-            return this.parent.createTypeResolver(type, dependency);
-        }
-        if (mapping.kind === 'value') {
-            const instance = mapping.value;
-            return () => instance;
-        } else if (mapping.kind === 'class') {
-            return this.createInjectResolver(mapping.type, mapping.id);
+        };
+
+        const container = putIfAbsent(this.classResolvers, dependencyType, (): ClassResolverContainer => ({
+            def: undefined,
+            map: new Map<ID, ResolverFunction>()
+        }));
+
+        if (id === '') {
+            if (container.def) {
+                return container.def;
+            }
+            const resolver = getResolver();
+            container.def = resolver;
+            return resolver;
         } else {
-            // mapping kind has to be provider
-            return mapping.provider;
+            return putIfAbsent(container.map, id, () => getResolver());
         }
     }
 
-    private storeParams(classType: Class, param: unknown, _id: ID = '') {
-        // TODO: store param by id so u could have different params per type
-        if (hasParameterAnnotation(classType)) {
-            if (!param) throw new Error(`Type ${classType.name} has a Parameter dependency but no parameters are provided`);
-            this.params.set(classType, param);
-        } else {
-            if (param) throw new Error(`Type ${classType.name} has unused parameters provided`);
+    private getTypeResolver(id: ID): ResolverFunction {
+        return putIfAbsent(this.typeResolvers, id, () => {
+            const mapping = this.getTypeMapping(id);
+            if (mapping.kind === undefined) {
+                // mapping.kind is undefined if there is a  type mapping without a target (toClass, toSingleton, toValue)
+                throw new Error(`No TypeMapping for id ${String(id)}.`);
+            }
+            if (mapping.kind === TypeMappingKind.VALUE) {
+                const instance = mapping.value;
+                return () => instance;
+            } else if (mapping.kind === TypeMappingKind.CLASS) {
+                return this.getCreateInstanceResolver(mapping.type);
+            } else if (mapping.kind === TypeMappingKind.SINGLETON) {
+                // use the injector defined in the mapping to get the right injector
+                const instance = putIfAbsent(mapping.injector.typeSingletons, id, () => mapping.injector.createInstance(mapping.type));
+                return () => instance;
+            } else {
+                // mapping kind has to be provider
+                return mapping.provider;
+            }
+        });
+    }
+
+    private getCreateInstanceResolver(type: Class) {
+        const resolvers = putIfAbsent(this.resolverArrays, type as Class, () => this.createResolverArray(type));
+        if (resolvers.length === 0) {
+            return () => new type();
         }
+        const args = new Array(resolvers.length);
+        return () => {
+            for (let i = 0; i < args.length; i++) {
+                args[i] = resolvers[i]();
+            }
+            return new type(...args);
+        };
+    }
+
+    private getTypeMapping(id: ID): TypeMapping {
+        const mapping = this.typeMappings.get(id);
+        if (!mapping) {
+            if (!this.parent) throw new Error(`No TypeMapping for id ${String(id)}`);
+            return this.parent.getTypeMapping(id);
+        }
+        return mapping;
     }
 
     dispose() {
@@ -394,66 +374,61 @@ class InternalTypeMapper<T> implements TypeMapper<T> {
     }
 
     toClass<C extends Class<T>>(classValue: C): void {
-        this.toClassId(classValue, '');
-    }
-
-    toClassId<C extends Class<T>>(classValue: C, id: ID): void {
         Object.assign<TypeMapping, ClassTypeMapping>(this.mapping, {
-            kind: 'class',
-            id: id,
+            kind: TypeMappingKind.CLASS,
             type: classValue
         });
     }
 
-    toMapClass<C extends Class<T>>(classValue: C, param?: FirstParameter<C>): ClassMapper<C> {
-        return this.toMapClassId(classValue, '', param);
-    }
-
-    toMapClassId<C extends Class<T>>(classValue: C, id: ID, param?: FirstParameter<C>): ClassMapper<C> {
-        Object.assign<TypeMapping, ClassTypeMapping>(this.mapping, {
-            kind: 'class',
-            id: id,
-            type: classValue
+    toSingleton<C extends Class<T>>(classValue: C): void {
+        Object.assign<TypeMapping, SingletonTypeMapping>(this.mapping, {
+            kind: TypeMappingKind.SINGLETON,
+            type: classValue,
+            injector:this.injector
         });
-        return this.injector.mapId(classValue, id, param);
     }
 
     toValue(value: T): void {
         Object.assign<TypeMapping, ValueTypeMapping>(this.mapping, {
-            kind: 'value',
+            kind: TypeMappingKind.VALUE,
             value: value
         });
     }
 
     toProvider(provider: () => T): void {
         Object.assign<TypeMapping, ProviderTypeMapping>(this.mapping, {
-            kind: 'provider',
+            kind: TypeMappingKind.PROVIDER,
             provider: provider
         });
     }
+
 }
 
 class InternalClassMapper<T extends Class> implements ClassMapper<T> {
     // instance is the default class mapping
-    mapping: ClassMapping = {kind: 'instance'};
+    mapping: ClassMapping = {kind: MappingKind.INSTANCE};
 
-    constructor(readonly type: Class) {
+    constructor(private readonly injector: Injector) {
     }
 
     toValue(value: InstanceType<T>) {
         Object.assign<ClassMapping, ValueClassMapping>(this.mapping, {
-            kind: 'value',
+            kind: MappingKind.VALUE,
             value: value
         });
     }
 
     toSingleton(): void {
-        this.mapping.kind = 'singleton';
+        Object.assign<ClassMapping, SingletonClassMapping>(this.mapping, {
+            kind: MappingKind.SINGLETON,
+            injector: this.injector
+        });
+        this.mapping.kind = MappingKind.SINGLETON;
     }
 
     toProvider(provider: () => InstanceType<T>): void {
         Object.assign<ClassMapping, ProviderClassMapping>(this.mapping, {
-            kind: 'provider',
+            kind: MappingKind.PROVIDER,
             provider: provider
         });
     }

@@ -33,6 +33,7 @@
     "build": "npm run clean && npm run build:cjs && npm run build:es2015 && npm run build:types",
     "build:cjs": "tsc",
     "build:es2015": "tsc -p ./typescript/tsconfig.esm2015.json",
+    "build:es5": "tsc -p ./typescript/tsconfig.esm5.json",
     "build:types": "tsc -p ./typescript/tsconfig.types.json",
     "clean": "rimraf ./dist",
     "watch": "tsc -p ./typescript/tsconfig.esm2015.json --watch",

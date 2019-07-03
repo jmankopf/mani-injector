@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import {Inject, InjectId, InjectType, Parameter} from '../src/injector';
+import {Inject, InjectId, InjectType} from '../src/injector';
 import {CircularB} from './circularB';
 
 export class DependencyA {
@@ -16,7 +16,6 @@ export interface Options {
 
 export class DependantA {
     constructor(
-        @Parameter readonly options: Options,
         @Inject readonly depA: DependencyA,
         @Inject readonly depB1: DependencyB,
         @InjectId('id') readonly depB2: DependencyB,
@@ -107,22 +106,6 @@ export class SimpleTypeUser {
 
     constructor(
         @InjectType(symbol1) readonly simpleType: SimpleType
-    ) {
-    }
-}
-
-export type Params = {
-    param1: number, param2: number;
-}
-
-export interface SimpleParamInterface {
-}
-
-export class SimpleParam implements SimpleParamInterface {
-    constructor(
-        @Parameter readonly params: Params,
-        @Inject readonly a: SimpleA,
-        @Inject readonly b: SimpleB,
     ) {
     }
 }
