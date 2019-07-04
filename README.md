@@ -3,10 +3,19 @@
 Very fast and lightweight dependency injection for typescript
 
 ## Usage
+```sh
+npm install mani-injector --save
 ```
-$ npm install mani-injector --save
-```
+Modify your `tsconfig.json` to include the following settings
 
+```json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}
+```
 #### Injecting classes
 ```typescript
 import {Inject, Injector} from 'mani-injector';
