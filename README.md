@@ -53,9 +53,12 @@ class FooBar {
 
 const injector = new Injector();
 
-injector.map(Foo, 'first');                 // new instance is created every time Foo is requested with the id 'first'
-injector.map(Foo, 'second').toSingleton();  // single instance is returned every time Foo is requested with the id 'second'
-injector.map(FooBar);                          // new instance is created every time FooBar is injected / requested
+// new instance is created every time Foo is requested with the id 'first'
+injector.map(Foo, 'first');
+// single instance is returned every time Foo is requested with the id 'second'
+injector.map(Foo, 'second').toSingleton();
+// new instance is created every time FooBar is injected / requested
+injector.map(FooBar);
 
 const fooBar1 = injector.get(FooBar);
 const fooBar2 = injector.get(FooBar);
@@ -92,16 +95,17 @@ const injector = new Injector();
 
 // every time the type with the id 'foo' is requested a new instance of Foo is created
 injector.mapType<IFoo>('foo').toClass(Foo);
-// every time the type with the symbol 'barSymbol' is requested a single instance of Bar is returned
+// every time the type with the symbol 'barSymbol' is requested a single instance 
+// of Bar is returned
 injector.mapType<IBar>(barSymbol).toSingleton(Bar);
-// every time the type with the id 'myFooBar' is requested a new instance of FooBar is created
+// every time the type with the id 'myFooBar' is requested a new instance of FooBar 
+// is created
 injector.mapType<IFooBar>('myFooBar').toClass(FooBar); 
 
 const fooBar1 = injector.getType<IFooBar>('myFooBar');
 const fooBar2 = injector.getType<IFooBar>('myFooBar');
 
 // There are 2 instances of FooBar, 2 instances of Foo and only 1 instance of Bar
-
 console.log(fooBar1.foo !== fooBar2.foo); // true
 console.log(fooBar1.bar === fooBar2.bar); // true
 console.log(fooBar1.bar instanceof Bar); // true
@@ -128,7 +132,7 @@ const barValue = {id: 1};
 
 // every time Foo is requested return the given value 'fooValue'
 injector.map(Foo).toValue(fooValue);
-// every time the type with id 'bar' is requested return the given value 'barValueÄ
+// every time the type with id 'bar' is requested return the given value 'barValue'
 injector.mapType<Bar>('bar').toValue(barValue);
 // new instance is created every time FooBar is injected / requested
 injector.map(FooBar);
@@ -177,9 +181,11 @@ let barCount = 0;
 const barProvider = () => {
     return new Bar(barCount++);
 };
-// every time Foo is requested the given provider function is called and the returned value is injected
+// every time Foo is requested the given provider function is called and the 
+// returned value is injected
 injector.map(Foo).toProvider(fooProvider);
-// every time the type with id 'bar' is requested the given provider function is called and the returned value is injected
+// every time the type with id 'bar' is requested the given provider function 
+// is called and the returned value is injected
 injector.mapType<Bar>('bar').toProvider(barProvider);
 // new instance is created every time FooBar is injected / requested
 injector.map(FooBar);
@@ -225,10 +231,12 @@ childInjector.map(Foo).toValue(childFoo);
 
 const mainFooBar = injector.get(FooBar);
 
-// FooBar is requested from the childInjector, the request is forwarded to the parent because the child injector has no mapping for it
+// FooBar is requested from the childInjector, the request is forwarded to the 
+// parent because the child injector has no mapping for it
 const childFooBar = childInjector.get(FooBar);
 
-// Bar is mapped in parent injector to a singleton and not overridden by the child injector
+// Bar is mapped in parent injector to a singleton and not overridden by the 
+// child injector
 console.log(mainFooBar.bar === childFooBar.bar);
 // Foo is overridden in child injector and mapped to the value childFoo
 console.log(childFooBar.foo === childFoo);
@@ -258,8 +266,10 @@ class SecondEntity {
 // this system is created for every entity that has a FooComponent
 class FooSystem {
     constructor(
-        @GetComponent readonly foo: FooComponent, // get a reference to the component when the system is created for a specific entity
-        @GetEntity readonly entity:Object // you can get the entity object
+        // get a reference to the component when the system is created for a specific entity
+        @GetComponent readonly foo: FooComponent,
+        // you can get the entity object
+        @GetEntity readonly entity:Object 
     ) {}
 }
 
@@ -275,7 +285,8 @@ class FooBarSystem {
     constructor(
         @GetComponent readonly foo: FooComponent,
         @GetComponent readonly bar: BarComponent,
-        @Inject readonly service: Service // you can inject everything that is mapped in the injector
+        // you can inject everything that is mapped in the injector
+        @Inject readonly service: Service 
     ) {}
 }
 
