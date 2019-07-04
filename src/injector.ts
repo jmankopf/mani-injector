@@ -267,13 +267,11 @@ export class Injector<SystemClass extends Class = Class> {
     }
 
     private getClassIdResolver(dependencyType: Class, id: ID) {
-        // TODO create a class/helper like putIfAbsent for nested maps / multiple keys
         const getResolver = (): ResolverFunction => {
             const mapping = this.getClassMapping(dependencyType, id);
             switch (mapping.kind) {
                 case MappingKind.INSTANCE:
                     return this.getCreateInstanceResolver(dependencyType);
-                // return () => this.createInstance(dependencyType);
                 case MappingKind.VALUE:
                     // we can cache the value for values
                     const instance = mapping.value;
@@ -384,7 +382,7 @@ class InternalTypeMapper<T> implements TypeMapper<T> {
         Object.assign<TypeMapping, SingletonTypeMapping>(this.mapping, {
             kind: TypeMappingKind.SINGLETON,
             type: classValue,
-            injector:this.injector
+            injector: this.injector
         });
     }
 
@@ -401,7 +399,6 @@ class InternalTypeMapper<T> implements TypeMapper<T> {
             provider: provider
         });
     }
-
 }
 
 class InternalClassMapper<T extends Class> implements ClassMapper<T> {
