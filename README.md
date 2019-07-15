@@ -8,6 +8,7 @@ The need for a very simple and very fast dependency injection solution to remove
 * type injection
 * map to instance, singleton, value or provider
 * child injector
+* small (350 lines of code, <b>1.27 kb</b> gzipped)
 * extendable
 ### Performance
 * ~ 40 times faster than InversifyJS
