@@ -39,12 +39,8 @@ export type ResolverContext = {
     kind: string;
 }
 
-const isInjectDependency = (dep: Dependency): dep is InjectDependency => {
-    return dep.kind === 'inject';
-};
-const isTypeDependency = (dep: Dependency): dep is TypeDependency => {
-    return dep.kind === 'type';
-};
+const isInjectDependency = (dep: Dependency): dep is InjectDependency => dep.kind === 'inject';
+const isTypeDependency = (dep: Dependency): dep is TypeDependency => dep.kind === 'type';
 
 interface ClassMapper<T extends Class> {
     toValue(value: InstanceType<T>): void;
@@ -103,7 +99,6 @@ export class Injector {
     protected readonly dependencyResolverExtensions: Map<string, DependencyExtensionResolver>;
 
     constructor(readonly parent?: Injector) {
-        // dependency resolver extensions are
         this.dependencyResolverExtensions = parent ? parent.dependencyResolverExtensions : new Map<string, DependencyExtensionResolver>();
         this.map(Injector).toValue(this);
     }
