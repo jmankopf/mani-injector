@@ -10,7 +10,7 @@ The need for a very simple and very fast dependency injection solution to remove
 * child injector
 * extendable
 ### Performance
-* ~ 40 times faster then InversifyJS
+* ~ 40 times faster than InversifyJS
 * ~ 5 times faster than TSyringe 
 * ~ 2.5  times faster than Typed Inject
 
