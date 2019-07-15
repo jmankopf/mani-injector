@@ -1,9 +1,7 @@
 # mani-injector
 A fast and lightweight dependency injection solution for typescript.
-
 ### Motivation
 The need for a very simple and very fast dependency injection solution to remove as much boilerplate code as possible without sacrificing runtime performance.
-
 ### Features
 * constructor injection only
 * class injection
@@ -11,8 +9,7 @@ The need for a very simple and very fast dependency injection solution to remove
 * map to instance, singleton, value or provider
 * child injector
 * extendable
-
-###Performance
+### Performance
 * ~ 40 times faster then InversifyJS
 * ~ 5 times faster than TSyringe 
 * ~ 2.5  times faster than Typed Inject
