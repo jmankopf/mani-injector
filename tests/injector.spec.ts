@@ -170,7 +170,7 @@ it('should map type to a (complex) class as singleton', () => {
 
 it('should throw error when no type mapping with the given id is found', () => {
     const injector = new Injector();
-    expect(() => injector.getType('test')).toThrow('No TypeMapping');
+    expect(() => injector.getType('test')).toThrow('No Mapping for Type with id: \'test\'');
 });
 
 it('should throw error when type isn´t mapped properly (there is no default mapping like with classes)', () => {

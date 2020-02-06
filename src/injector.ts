@@ -129,11 +129,19 @@ export class Injector {
     }
 
     getType<T>(id: ID): T {
-        return this.getTypeResolver(id)() as T;
+        const typeResolver = this.getTypeResolver(id);
+        if (!typeResolver) {
+            throw new Error(`No Mapping for Type with id: '${String(id)}'`);
+        }
+        return typeResolver() as T;
     }
 
     get<T extends Class>(type: T, id: ID = ''): InstanceType<T> {
-        return this.getClassIdResolver(type, id)() as InstanceType<T>;
+        const resolver = this.getClassIdResolver(type, id);
+        if (!resolver) {
+            throw new Error(`No Mapping for Type ${type.name}` + String(id === '' ? '' : ` with id: '${String(id)}'`));
+        }
+        return resolver() as InstanceType<T>;
     }
 
     protected createInstance<T extends Class>(type: T) {
@@ -151,9 +159,17 @@ export class Injector {
             let resolver: ResolverFunction;
             if (isInjectDependency(dependency)) {
                 if (!dependency.type) throw new Error(`Undefined dependency type for ${type.name}. Check for circular dependency.`);
-                resolver = this.getClassIdResolver(dependency.type, dependency.id);
+                const classIdResolver = this.getClassIdResolver(dependency.type, dependency.id);
+                if (!classIdResolver) {
+                    throw new Error(`Could not inject ${dependency.type.name} into ${resolverContext.type.name}`);
+                }
+                resolver = classIdResolver;
             } else if (isTypeDependency(dependency)) {
-                resolver = this.getTypeResolver(dependency.id);
+                const typeResolver = this.getTypeResolver(dependency.id);
+                if (!typeResolver) {
+                    throw new Error(`Could not inject type with id '${String(dependency.id)}' into ${resolverContext.type.name}`);
+                }
+                resolver = typeResolver;
             } else {
                 const extensionResolver = this.dependencyResolverExtensions.get(dependency.kind);
                 if (!extensionResolver) {
@@ -166,27 +182,24 @@ export class Injector {
         return result;
     }
 
-    protected getClassMapping(type: Class, id: ID): ClassMapping {
+    protected getClassMapping(type: Class, id: ID): ClassMapping | undefined {
         const idMapping = this.classMappings.get(type);
         if (!idMapping) {
-            if (!this.parent) {
-                throw new Error(`No Mapping for Type ${type.name}`);
-            }
+            if (!this.parent) return undefined;
             return this.parent.getClassMapping(type, id);
         }
         const mapping = id === '' ? idMapping.def : idMapping.map.get(id);
         if (!mapping) {
-            if (!this.parent) {
-                throw new Error(`No Mapping for Type ${type.name} with id: '${String(id)}'`);
-            }
+            if (!this.parent) return undefined;
             return this.parent.getClassMapping(type, id);
         }
         return mapping;
     }
 
     protected getClassIdResolver(dependencyType: Class, id: ID) {
-        const getResolver = (): ResolverFunction => {
+        const getResolver = (): ResolverFunction | undefined => {
             const mapping = this.getClassMapping(dependencyType, id);
+            if (!mapping) return undefined;
             switch (mapping.kind) {
                 case ClassMappingKind.INSTANCE:
                     return this.getCreateInstanceResolver(dependencyType);
@@ -217,7 +230,7 @@ export class Injector {
 
         const container = putIfAbsent(this.classResolvers, dependencyType, (): ClassResolverContainer => ({
             def: undefined,
-            map: new Map<ID, ResolverFunction>()
+            map: new Map<ID, ResolverFunction>(),
         }));
 
         if (id === '') {
@@ -232,9 +245,10 @@ export class Injector {
         }
     }
 
-    protected getTypeResolver(id: ID): ResolverFunction {
+    protected getTypeResolver(id: ID): ResolverFunction | undefined {
         return putIfAbsent(this.typeResolvers, id, () => {
             const mapping = this.getTypeMapping(id);
+            if (!mapping) return undefined;
             if (mapping.kind === undefined) {
                 // mapping.kind is undefined if there is a  type mapping without a target (toClass, toSingleton, toValue)
                 throw new Error(`No TypeMapping for id ${String(id)}.`);
@@ -258,7 +272,7 @@ export class Injector {
     protected getCreateInstanceResolver(type: Class) {
         const resolvers = putIfAbsent(this.parameterResolverArrays, type as Class, () => this.createResolverArray({
             kind: 'class',
-            type: type
+            type: type,
         }));
         if (resolvers.length === 0) {
             return () => new type();
@@ -272,10 +286,10 @@ export class Injector {
         };
     }
 
-    protected getTypeMapping(id: ID): TypeMapping {
+    protected getTypeMapping(id: ID): TypeMapping | undefined {
         const mapping = this.typeMappings.get(id);
         if (!mapping) {
-            if (!this.parent) throw new Error(`No TypeMapping for id ${String(id)}`);
+            if (!this.parent) return undefined;
             return this.parent.getTypeMapping(id);
         }
         return mapping;
@@ -291,7 +305,7 @@ class InternalTypeMapper<T> implements TypeMapper<T> {
     toClass<C extends Class<T>>(classValue: C): void {
         Object.assign<TypeMapping, ClassTypeMapping>(this.mapping, {
             kind: TypeMappingKind.CLASS,
-            type: classValue
+            type: classValue,
         });
     }
 
@@ -299,21 +313,21 @@ class InternalTypeMapper<T> implements TypeMapper<T> {
         Object.assign<TypeMapping, SingletonTypeMapping>(this.mapping, {
             kind: TypeMappingKind.SINGLETON,
             type: classValue,
-            injector: this.injector
+            injector: this.injector,
         });
     }
 
     toValue(value: T): void {
         Object.assign<TypeMapping, ValueTypeMapping>(this.mapping, {
             kind: TypeMappingKind.VALUE,
-            value: value
+            value: value,
         });
     }
 
     toProvider(provider: () => T): void {
         Object.assign<TypeMapping, ProviderTypeMapping>(this.mapping, {
             kind: TypeMappingKind.PROVIDER,
-            provider: provider
+            provider: provider,
         });
     }
 }
@@ -322,20 +336,19 @@ class InternalClassMapper<T extends Class> implements ClassMapper<T> {
     // instance is the default class mapping
     mapping: ClassMapping = {kind: ClassMappingKind.INSTANCE};
 
-    constructor(private readonly injector: Injector) {
-    }
+    constructor(private readonly injector: Injector) {}
 
     toValue(value: InstanceType<T>) {
         Object.assign<ClassMapping, ValueClassMapping>(this.mapping, {
             kind: ClassMappingKind.VALUE,
-            value: value
+            value: value,
         });
     }
 
     toSingleton(): void {
         Object.assign<ClassMapping, SingletonClassMapping>(this.mapping, {
             kind: ClassMappingKind.SINGLETON,
-            injector: this.injector
+            injector: this.injector,
         });
         this.mapping.kind = ClassMappingKind.SINGLETON;
     }
@@ -343,7 +356,7 @@ class InternalClassMapper<T extends Class> implements ClassMapper<T> {
     toProvider(provider: () => InstanceType<T>): void {
         Object.assign<ClassMapping, ProviderClassMapping>(this.mapping, {
             kind: ClassMappingKind.PROVIDER,
-            provider: provider
+            provider: provider,
         });
     }
 }
