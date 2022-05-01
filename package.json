@@ -1,6 +1,6 @@
 {
   "name": "mani-injector",
-  "version": "0.0.3",
+  "version": "0.0.4-0",
   "description": "Very fast and lightweight dependency injection for typescript",
   "author": "Jan Mankopf",
   "keywords": [
