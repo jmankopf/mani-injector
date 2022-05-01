@@ -343,6 +343,7 @@ class InternalClassMapper<T extends Class> implements ClassMapper<T> {
             kind: ClassMappingKind.VALUE,
             value: value,
         });
+        return value;
     }
 
     toSingleton(): void {
